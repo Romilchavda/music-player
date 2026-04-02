@@ -1,7 +1,4 @@
-// Hum 2 alag API links use karenge, agar ek kaam na kare toh doosra chale
-const primaryAPI = "https://saavn.dev/api/search/songs?query=";
-const backupAPI = "https://jiosaavn-api-sigma.vercel.app/search/songs?query=";
-
+// Hum direct search query use karenge
 async function searchMusic() {
     const query = document.getElementById('searchInput').value;
     const resultsDiv = document.getElementById('results');
@@ -11,48 +8,73 @@ async function searchMusic() {
         return;
     }
 
-    resultsDiv.innerHTML = "<p>Loading... Gaane dhund raha hoon...</p>";
+    resultsDiv.innerHTML = "<p style='color: #1db954;'>Searching... Please wait...</p>";
 
-    try {
-        // Pehle primary API try karte hain
-        let response = await fetch(primaryAPI + query);
-        
-        // Agar primary fail ho toh backup try karein
-        if (!response.ok) {
-            response = await fetch(backupAPI + query);
+    // Hum 2 alag-alag API endpoints try karenge
+    const apiUrls = [
+        `https://saavn.dev/api/search/songs?query=${query}`,
+        `https://jiosaavn-api-sigma.vercel.app/search/songs?query=${query}`
+    ];
+
+    let success = false;
+
+    for (let url of apiUrls) {
+        if (success) break;
+
+        try {
+            const response = await fetch(url);
+            if (!response.ok) throw new Error("Network issues");
+            
+            const data = await response.json();
+            const songs = data.data.results || data.data;
+
+            if (songs && songs.length > 0) {
+                displayResults(songs);
+                success = true;
+            }
+        } catch (error) {
+            console.log("Ek API fail hui, doosri try kar raha hoon...");
         }
-
-        const data = await response.json();
-        const songs = data.data.results || data.data; // Dono API ka format handle karne ke liye
-
-        if (songs && songs.length > 0) {
-            resultsDiv.innerHTML = ""; // Loading text hatao
-            songs.forEach(song => {
-                // Quality links check
-                const downloadUrl = song.downloadUrl ? song.downloadUrl[song.downloadUrl.length - 1].url : song.download_url;
-                const image = song.image ? (song.image[2]?.url || song.image[0]?.url) : song.image_url;
-                const title = song.name || song.song;
-                const artist = (song.artists && song.artists.primary) ? song.artists.primary[0].name : (song.primary_artists || "Artist");
-
-                const div = document.createElement('div');
-                div.className = 'song-card';
-                div.innerHTML = `
-                    <img src="${image}" alt="cover" style="width:50px; border-radius:5px;">
-                    <div style="flex:1; text-align:left; margin-left:15px; cursor:pointer;" onclick="playSong('${downloadUrl}', '${title.replace(/'/g, "\\'")}', '${image}')">
-                        <p style="margin:0;"><strong>${title}</strong></p>
-                        <small style="color:#b3b3b3;">${artist}</small>
-                    </div>
-                `;
-                resultsDiv.appendChild(div);
-            });
-        } else {
-            resultsDiv.innerHTML = "<p>Koi gaana nahi mila. Kuch aur search karein!</p>";
-        }
-    } catch (error) {
-        console.error("Error details:", error);
-        resultsDiv.innerHTML = `<p style="color:red;">Error: API se connect nahi ho pa raha. <br> Kripya apna Internet check karein ya thodi der baad try karein.</p>`;
-        alert("API Error! Please check console or internet.");
     }
+
+    if (!success) {
+        resultsDiv.innerHTML = "<p style='color:red;'>Nahi mila! Try: <br> 1. Internet check karein. <br> 2. Spelling check karein. <br> 3. VPN band karein agar on hai.</p>";
+    }
+}
+
+function displayResults(songs) {
+    const resultsDiv = document.getElementById('results');
+    resultsDiv.innerHTML = ""; 
+
+    songs.forEach(song => {
+        // Image aur Name nikalna (Alag API mein alag naam hote hain)
+        const title = song.name || song.song || "Unknown Song";
+        const image = song.image ? (song.image[2]?.url || song.image[0]?.url) : "https://via.placeholder.com/50";
+        const artist = song.artists?.primary?.[0]?.name || song.primary_artists || "Artist";
+        
+        // Sabse best quality MP3 link
+        let downloadUrl = "";
+        if (song.downloadUrl) {
+            downloadUrl = song.downloadUrl[song.downloadUrl.length - 1].url;
+        } else if (song.download_url) {
+            downloadUrl = song.download_url;
+        }
+
+        if (downloadUrl) {
+            const div = document.createElement('div');
+            div.className = 'song-card';
+            div.style = "display: flex; align-items: center; background: #282828; margin: 10px; padding: 10px; border-radius: 10px; cursor: pointer;";
+            div.innerHTML = `
+                <img src="${image}" style="width:50px; height:50px; border-radius:5px; margin-right:15px;">
+                <div style="flex:1; text-align:left;">
+                    <p style="margin:0; font-size:14px;"><strong>${title}</strong></p>
+                    <p style="margin:0; font-size:12px; color:#b3b3b3;">${artist}</p>
+                </div>
+            `;
+            div.onclick = () => playSong(downloadUrl, title, image);
+            resultsDiv.appendChild(div);
+        }
+    });
 }
 
 function playSong(url, title, img) {
@@ -61,5 +83,5 @@ function playSong(url, title, img) {
     document.getElementById('trackImage').src = img;
     
     audio.src = url;
-    audio.play();
+    audio.play().catch(e => alert("Play nahi ho paya, link expire ho gaya shayad."));
 }
