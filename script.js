@@ -7,9 +7,9 @@ async function searchMusic() {
         return;
     }
 
-    resultsDiv.innerHTML = "<p style='color: #1db954;'>Searching on Global Servers...</p>";
+    resultsDiv.innerHTML = "<p style='color: #1db954;'>Searching on Apple Servers...</p>";
 
-    // Hum Apple ke server se search karenge kyunki ye block nahi hota
+    // Search hamesha iTunes se karein kyunki ye block nahi hota
     const searchUrl = `https://itunes.apple.com/search?term=${encodeURIComponent(query)}&entity=song&limit=15`;
 
     try {
@@ -23,7 +23,8 @@ async function searchMusic() {
                 const title = song.trackName;
                 const artist = song.artistName;
                 const image = song.artworkUrl100.replace('100x100', '500x500');
-                
+                const preview = song.previewUrl; // 30-sec backup link
+
                 const div = document.createElement('div');
                 div.className = 'song-card';
                 div.style = "display: flex; align-items: center; background: #222; margin: 10px 0; padding: 12px; border-radius: 12px; cursor: pointer; border: 1px solid #333;";
@@ -34,49 +35,50 @@ async function searchMusic() {
                         <p style="margin:0; font-size:12px; color:#aaa;">${artist}</p>
                     </div>
                 `;
-                // Jab click karein toh Saavn se full song dhoondhein
-                div.onclick = () => findFullSong(title + " " + artist, title, image);
+                // Click par pehle full song try karega, fail hua toh 30-sec preview bajega
+                div.onclick = () => playFullOrPreview(title + " " + artist, title, image, preview);
                 resultsDiv.appendChild(div);
             });
         } else {
             resultsDiv.innerHTML = "<p>Gaana nahi mila!</p>";
         }
     } catch (error) {
-        resultsDiv.innerHTML = "<p style='color:red;'>Network Blocked! Check DNS Settings.</p>";
+        resultsDiv.innerHTML = "<p style='color:red;'>Search failed. Network issues.</p>";
     }
 }
 
-// Ye function Apple ke gaane ko Saavn ke full song link se jodega
-async function findFullSong(query, title, img) {
-    document.getElementById('trackTitle').innerText = "Fetching Full Song...";
+async function playFullOrPreview(query, title, img, preview) {
     const audio = document.getElementById('audioPlayer');
+    document.getElementById('trackTitle').innerText = "Unlocking Full Song...";
+    document.getElementById('trackImage').src = img;
 
-    // Hum 2 alag mirrors try karenge
-    const apiUrls = [
-        `https://saavn.dev/api/search/songs?query=${encodeURIComponent(query)}`,
-        `https://jiosaavn-api-sigma.vercel.app/search/songs?query=${encodeURIComponent(query)}`
-    ];
+    // JioSaavn API URL
+    const saavnUrl = `https://saavn.dev/api/search/songs?query=${encodeURIComponent(query)}`;
+    
+    // Sabse important: Hum PROXY use karenge taaki Jio/Airtel block na kar sake
+    const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(saavnUrl)}`;
 
-    let found = false;
-    for(let url of apiUrls) {
-        try {
-            const res = await fetch(url);
-            const data = await res.json();
-            const song = data.data.results[0] || data.data[0];
-            
-            if(song) {
-                const downloadUrl = song.downloadUrl ? song.downloadUrl[song.downloadUrl.length - 1].url : song.download_url;
-                document.getElementById('trackTitle').innerText = title;
-                document.getElementById('trackImage').src = img;
-                audio.src = downloadUrl;
-                audio.play();
-                found = true;
-                break;
-            }
-        } catch(e) { continue; }
-    }
-
-    if(!found) {
-        alert("Full song server block hai. Please follow Step 2 (DNS) below!");
+    try {
+        const res = await fetch(proxyUrl);
+        const data = await res.json();
+        const finalData = JSON.parse(data.contents); // Proxy se data 'contents' mein aata hai
+        
+        const song = finalData.data.results[0];
+        
+        if (song) {
+            const fullUrl = song.downloadUrl[song.downloadUrl.length - 1].url;
+            audio.src = fullUrl;
+            document.getElementById('trackTitle').innerText = title + " (Full)";
+            audio.play();
+        } else {
+            throw new Error("No full song");
+        }
+    } catch (e) {
+        // Agar Full song block ho gaya toh Apple ka 30-sec Preview bajao
+        console.log("Playing preview as fallback...");
+        audio.src = preview;
+        document.getElementById('trackTitle').innerText = title + " (Preview Only)";
+        audio.play();
+        alert("Full song server block hai, abhi preview baj raha hai. DNS check karein!");
     }
 }
