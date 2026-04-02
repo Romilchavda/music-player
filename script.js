@@ -7,25 +7,23 @@ async function searchMusic() {
         return;
     }
 
-    resultsDiv.innerHTML = "<p style='color: #1db954;'>Naye server se connect ho raha hoon...</p>";
+    resultsDiv.innerHTML = "<p style='color: #1db954;'>Searching on Apple Music Server...</p>";
 
-    // NAYA SERVER LINK (saavn.dev ki jagah ye use karein)
-    const url = `https://jiosaavn-api-sigma.vercel.app/search/songs?query=${encodeURIComponent(query)}`;
+    // Apple Music (iTunes) Official API - Ye block nahi hoti
+    const url = `https://itunes.apple.com/search?term=${encodeURIComponent(query)}&entity=song&limit=15`;
 
     try {
         const response = await fetch(url);
-        const resData = await response.json();
-        
-        // Is API ka data format thoda alag ho sakta hai
-        const songs = resData.data.results || resData.data;
+        const data = await response.json();
+        const songs = data.results;
 
         if (songs && songs.length > 0) {
             resultsDiv.innerHTML = ""; 
             songs.forEach(song => {
-                const title = song.name || song.title;
-                const image = song.image[2]?.url || song.image[1]?.url || song.image[0]?.url;
-                const artist = song.artists?.primary[0]?.name || "Artist";
-                const downloadUrl = song.downloadUrl[song.downloadUrl.length - 1].url;
+                const title = song.trackName;
+                const image = song.artworkUrl100.replace('100x100', '400x400'); // Better quality
+                const artist = song.artistName;
+                const previewUrl = song.previewUrl; // 30-sec official preview link
 
                 const div = document.createElement('div');
                 div.className = 'song-card';
@@ -37,15 +35,15 @@ async function searchMusic() {
                         <p style="margin:0; font-size:12px; color:#aaa;">${artist}</p>
                     </div>
                 `;
-                div.onclick = () => playSong(downloadUrl, title, image);
+                div.onclick = () => playSong(previewUrl, title, image);
                 resultsDiv.appendChild(div);
             });
         } else {
-            resultsDiv.innerHTML = "<p>Gaana nahi mila. Kuch aur try karein!</p>";
+            resultsDiv.innerHTML = "<p>Gaana nahi mila. Spelling check karein!</p>";
         }
     } catch (error) {
         console.error(error);
-        resultsDiv.innerHTML = `<p style='color:red;'>Naya server bhi block hai! <br> Bhai, aapka internet API block kar raha hai.</p>`;
+        resultsDiv.innerHTML = `<p style='color:red;'>Apple Server se bhi connect nahi ho raha! <br> Bhai, aapka browser ya network requests block kar raha hai.</p>`;
     }
 }
 
@@ -54,5 +52,5 @@ function playSong(url, title, img) {
     document.getElementById('trackTitle').innerText = title;
     document.getElementById('trackImage').src = img;
     audio.src = url;
-    audio.play().catch(e => alert("Play error! Try another song."));
+    audio.play().catch(e => alert("Play error! Apne mobile ka Volume check karein."));
 }
