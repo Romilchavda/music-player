@@ -3,93 +3,80 @@ async function searchMusic() {
     const resultsDiv = document.getElementById('results');
     
     if (!query) {
-        alert("Pehle gaane ka naam likhein!");
+        alert("Gaane ka naam likhein!");
         return;
     }
 
-    resultsDiv.innerHTML = "<p style='color: #1db954;'>YouTube Music se Full Song dhoond raha hoon...</p>";
+    resultsDiv.innerHTML = "<p style='color: #1db954;'>Searching on Global Servers...</p>";
 
-    // Hum do alag-alag YouTube servers try karenge
-    const servers = [
-        "https://pipedapi.kavin.rocks",
-        "https://pipedapi.oxymat.com"
-    ];
-
-    let success = false;
-
-    for (let baseUrl of servers) {
-        if (success) break;
-
-        // Hum Proxy use kar rahe hain taaki Jio/Airtel block na kare
-        const targetUrl = `${baseUrl}/search?q=${encodeURIComponent(query)}&filter=music_songs`;
-        const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(targetUrl)}`;
-
-        try {
-            const response = await fetch(proxyUrl);
-            const data = await response.json();
-            const finalData = JSON.parse(data.contents); // Proxy data ko parse karna padta hai
-            const songs = finalData.items;
-
-            if (songs && songs.length > 0) {
-                displayResults(songs, baseUrl);
-                success = true;
-            }
-        } catch (error) {
-            console.log("Server failed, trying next...");
-        }
-    }
-
-    if (!success) {
-        resultsDiv.innerHTML = "<p style='color:red;'>YouTube Server Busy! <br> Ek baar firse 'Search' dabayein.</p>";
-    }
-}
-
-function displayResults(songs, baseUrl) {
-    const resultsDiv = document.getElementById('results');
-    resultsDiv.innerHTML = ""; 
-
-    songs.forEach(song => {
-        const title = song.title;
-        const image = song.thumbnail;
-        const artist = song.uploaderName;
-        const videoId = song.url.split("v=")[1];
-
-        const div = document.createElement('div');
-        div.className = 'song-card';
-        div.style = "display: flex; align-items: center; background: #222; margin: 10px 0; padding: 12px; border-radius: 12px; cursor: pointer; border: 1px solid #333;";
-        div.innerHTML = `
-            <img src="${image}" style="width:55px; height:55px; border-radius:8px; margin-right:15px; object-fit: cover;">
-            <div style="flex:1; text-align:left;">
-                <p style="margin:0; font-size:14px; color:#fff;"><strong>${title}</strong></p>
-                <p style="margin:0; font-size:12px; color:#aaa;">${artist}</p>
-            </div>
-        `;
-        div.onclick = () => getStream(videoId, title, image, baseUrl);
-        resultsDiv.appendChild(div);
-    });
-}
-
-async function getStream(videoId, title, img, baseUrl) {
-    const audio = document.getElementById('audioPlayer');
-    document.getElementById('trackTitle').innerText = "Loading Full Song...";
-    
-    // Stream fetch karne ke liye bhi proxy use karenge
-    const targetUrl = `${baseUrl}/streams/${videoId}`;
-    const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(targetUrl)}`;
+    // Hum Apple ke server se search karenge kyunki ye block nahi hota
+    const searchUrl = `https://itunes.apple.com/search?term=${encodeURIComponent(query)}&entity=song&limit=15`;
 
     try {
-        const res = await fetch(proxyUrl);
-        const data = await res.json();
-        const finalData = JSON.parse(data.contents);
-        
-        // Sabse badhiya audio dhoondna
-        const audioStream = finalData.audioStreams.find(s => s.format === 'M4A') || finalData.audioStreams[0];
+        const response = await fetch(searchUrl);
+        const data = await response.json();
+        const songs = data.results;
 
-        document.getElementById('trackTitle').innerText = title;
-        document.getElementById('trackImage').src = img;
-        audio.src = audioStream.url;
-        audio.play();
-    } catch (e) {
-        alert("Ye gaana load nahi ho raha, dusra try karein.");
+        if (songs && songs.length > 0) {
+            resultsDiv.innerHTML = ""; 
+            songs.forEach(song => {
+                const title = song.trackName;
+                const artist = song.artistName;
+                const image = song.artworkUrl100.replace('100x100', '500x500');
+                
+                const div = document.createElement('div');
+                div.className = 'song-card';
+                div.style = "display: flex; align-items: center; background: #222; margin: 10px 0; padding: 12px; border-radius: 12px; cursor: pointer; border: 1px solid #333;";
+                div.innerHTML = `
+                    <img src="${image}" style="width:55px; height:55px; border-radius:8px; margin-right:15px; object-fit: cover;">
+                    <div style="flex:1; text-align:left;">
+                        <p style="margin:0; font-size:14px; color:#fff;"><strong>${title}</strong></p>
+                        <p style="margin:0; font-size:12px; color:#aaa;">${artist}</p>
+                    </div>
+                `;
+                // Jab click karein toh Saavn se full song dhoondhein
+                div.onclick = () => findFullSong(title + " " + artist, title, image);
+                resultsDiv.appendChild(div);
+            });
+        } else {
+            resultsDiv.innerHTML = "<p>Gaana nahi mila!</p>";
+        }
+    } catch (error) {
+        resultsDiv.innerHTML = "<p style='color:red;'>Network Blocked! Check DNS Settings.</p>";
+    }
+}
+
+// Ye function Apple ke gaane ko Saavn ke full song link se jodega
+async function findFullSong(query, title, img) {
+    document.getElementById('trackTitle').innerText = "Fetching Full Song...";
+    const audio = document.getElementById('audioPlayer');
+
+    // Hum 2 alag mirrors try karenge
+    const apiUrls = [
+        `https://saavn.dev/api/search/songs?query=${encodeURIComponent(query)}`,
+        `https://jiosaavn-api-sigma.vercel.app/search/songs?query=${encodeURIComponent(query)}`
+    ];
+
+    let found = false;
+    for(let url of apiUrls) {
+        try {
+            const res = await fetch(url);
+            const data = await res.json();
+            const song = data.data.results[0] || data.data[0];
+            
+            if(song) {
+                const downloadUrl = song.downloadUrl ? song.downloadUrl[song.downloadUrl.length - 1].url : song.download_url;
+                document.getElementById('trackTitle').innerText = title;
+                document.getElementById('trackImage').src = img;
+                audio.src = downloadUrl;
+                audio.play();
+                found = true;
+                break;
+            }
+        } catch(e) { continue; }
+    }
+
+    if(!found) {
+        alert("Full song server block hai. Please follow Step 2 (DNS) below!");
     }
 }
