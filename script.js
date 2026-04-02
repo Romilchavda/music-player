@@ -3,28 +3,31 @@ async function searchMusic() {
     const resultsDiv = document.getElementById('results');
     
     if (!query) {
-        alert("Gaane ka naam likhein!");
+        alert("Pehle gaane ka naam likhein!");
         return;
     }
 
-    resultsDiv.innerHTML = "<p style='color: #1db954;'>Wait... Gaane dhoond raha hoon...</p>";
+    resultsDiv.innerHTML = "<p style='color: #1db954;'>Searching via Super-Proxy... Please wait...</p>";
 
-    // Naya Stable API Link (No Proxy Needed)
-    const url = `https://saavn.dev/api/search/songs?query=${encodeURIComponent(query)}`;
+    // Hum do alag-alag proxy aur server try karenge ek saath
+    // Sabse stable link:
+    const targetUrl = `https://saavn.dev/api/search/songs?query=${encodeURIComponent(query)}`;
+    const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`;
 
     try {
-        const response = await fetch(url);
-        
-        if (!response.ok) throw new Error("Server down");
+        const response = await fetch(proxyUrl);
+        if (!response.ok) throw new Error("Proxy Error");
 
         const resData = await response.json();
-        const songs = resData.data.results;
-
-        if (songs && songs.length > 0) {
+        
+        // Data format check
+        if (resData && resData.data && resData.data.results.length > 0) {
+            const songs = resData.data.results;
             resultsDiv.innerHTML = ""; 
+
             songs.forEach(song => {
                 const title = song.name;
-                const image = song.image[2]?.url || song.image[1]?.url;
+                const image = song.image[2]?.url || song.image[0]?.url;
                 const artist = song.artists?.primary[0]?.name || "Artist";
                 const downloadUrl = song.downloadUrl[song.downloadUrl.length - 1].url;
 
@@ -42,12 +45,20 @@ async function searchMusic() {
                 resultsDiv.appendChild(div);
             });
         } else {
-            resultsDiv.innerHTML = "<p>Koi gaana nahi mila. Spelling check karein!</p>";
+            resultsDiv.innerHTML = "<p>Gaana nahi mila. Dusra naam try karein!</p>";
         }
     } catch (error) {
-        console.error(error);
-        resultsDiv.innerHTML = `<p style='color:red;'>Error: Server connect nahi ho raha. <br> 1. Apna Internet check karein. <br> 2. Chrome browser hi use karein.</p>`;
+        console.error("Debug Error:", error);
+        resultsDiv.innerHTML = `
+            <p style='color:orange;'>Abhi bhi block ho raha hai! :(</p>
+            <button onclick="checkDirectLink()" style="padding:10px; background:#1db954; color:white; border:none; border-radius:5px;">Check Server Status</button>
+        `;
     }
+}
+
+// Ye function check karega ki server aapke mobile par zinda hai ya nahi
+function checkDirectLink() {
+    window.open("https://saavn.dev/api/search/songs?query=makhna", "_blank");
 }
 
 function playSong(url, title, img) {
@@ -55,5 +66,5 @@ function playSong(url, title, img) {
     document.getElementById('trackTitle').innerText = title;
     document.getElementById('trackImage').src = img;
     audio.src = url;
-    audio.play().catch(e => alert("Play error: Browser setting allow nahi kar rahi."));
+    audio.play().catch(e => alert("Play error! Song link expired or blocked."));
 }
