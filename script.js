@@ -1,51 +1,50 @@
-// Hum 3 alag-alag servers ki list rakhenge
-const servers = [
-    "https://pipedapi.kavin.rocks",
-    "https://pipedapi.oxymat.com",
-    "https://piped-api.lunar.icu"
-];
-
-let currentServer = servers[0];
-
 async function searchMusic() {
     const query = document.getElementById('searchInput').value;
     const resultsDiv = document.getElementById('results');
     
     if (!query) {
-        alert("Gaane ka naam likhein!");
+        alert("Pehle gaane ka naam likhein!");
         return;
     }
 
-    resultsDiv.innerHTML = "<p style='color: #1db954;'>Searching on YouTube Server... Ek pal rukein...</p>";
+    resultsDiv.innerHTML = "<p style='color: #1db954;'>YouTube Music se Full Song dhoond raha hoon...</p>";
+
+    // Hum do alag-alag YouTube servers try karenge
+    const servers = [
+        "https://pipedapi.kavin.rocks",
+        "https://pipedapi.oxymat.com"
+    ];
 
     let success = false;
 
-    // Ek-ek karke servers try karenge
-    for (let server of servers) {
-        try {
-            const response = await fetch(`${server}/search?q=${encodeURIComponent(query)}&filter=music_songs`);
-            if (!response.ok) throw new Error("Next server please");
+    for (let baseUrl of servers) {
+        if (success) break;
 
+        // Hum Proxy use kar rahe hain taaki Jio/Airtel block na kare
+        const targetUrl = `${baseUrl}/search?q=${encodeURIComponent(query)}&filter=music_songs`;
+        const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(targetUrl)}`;
+
+        try {
+            const response = await fetch(proxyUrl);
             const data = await response.json();
-            const songs = data.items;
+            const finalData = JSON.parse(data.contents); // Proxy data ko parse karna padta hai
+            const songs = finalData.items;
 
             if (songs && songs.length > 0) {
-                currentServer = server; // Jo server chal gaya use yaad rakho
-                displayResults(songs);
+                displayResults(songs, baseUrl);
                 success = true;
-                break; 
             }
-        } catch (err) {
+        } catch (error) {
             console.log("Server failed, trying next...");
         }
     }
 
     if (!success) {
-        resultsDiv.innerHTML = "<p style='color:red;'>Sabhi servers busy hain! <br> Ek baar firse 'Search' button dabayein.</p>";
+        resultsDiv.innerHTML = "<p style='color:red;'>YouTube Server Busy! <br> Ek baar firse 'Search' dabayein.</p>";
     }
 }
 
-function displayResults(songs) {
+function displayResults(songs, baseUrl) {
     const resultsDiv = document.getElementById('results');
     resultsDiv.innerHTML = ""; 
 
@@ -65,29 +64,32 @@ function displayResults(songs) {
                 <p style="margin:0; font-size:12px; color:#aaa;">${artist}</p>
             </div>
         `;
-        div.onclick = () => getStream(videoId, title, image);
+        div.onclick = () => getStream(videoId, title, image, baseUrl);
         resultsDiv.appendChild(div);
     });
 }
 
-async function getStream(videoId, title, img) {
+async function getStream(videoId, title, img, baseUrl) {
     const audio = document.getElementById('audioPlayer');
     document.getElementById('trackTitle').innerText = "Loading Full Song...";
     
+    // Stream fetch karne ke liye bhi proxy use karenge
+    const targetUrl = `${baseUrl}/streams/${videoId}`;
+    const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(targetUrl)}`;
+
     try {
-        const res = await fetch(`${currentServer}/streams/${videoId}`);
+        const res = await fetch(proxyUrl);
         const data = await res.json();
+        const finalData = JSON.parse(data.contents);
         
-        // M4A format sabse badhiya hota hai mobile ke liye
-        const audioStream = data.audioStreams.find(s => s.format === 'M4A') || data.audioStreams[0];
-        const finalUrl = audioStream.url;
+        // Sabse badhiya audio dhoondna
+        const audioStream = finalData.audioStreams.find(s => s.format === 'M4A') || finalData.audioStreams[0];
 
         document.getElementById('trackTitle').innerText = title;
         document.getElementById('trackImage').src = img;
-        audio.src = finalUrl;
+        audio.src = audioStream.url;
         audio.play();
     } catch (e) {
-        alert("Ye gaana load nahi ho paya, doosra try karein.");
-        document.getElementById('trackTitle').innerText = "Error playing song";
+        alert("Ye gaana load nahi ho raha, dusra try karein.");
     }
 }
