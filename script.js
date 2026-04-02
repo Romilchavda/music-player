@@ -7,49 +7,55 @@ async function searchMusic() {
         return;
     }
 
-    // Naya message taaki pata chale naya code chal raha hai
-    resultsDiv.innerHTML = "<p style='color: #1db954;'>Searching on Servers... Please wait...</p>";
+    resultsDiv.innerHTML = "<p style='color: #1db954;'>Searching... Sabar rakhein...</p>";
 
-    // Is link mein maine random number add kiya hai taaki error na aaye
-    const url = `https://saavn.dev/api/search/songs?query=${encodeURIComponent(query)}&_t=${Date.now()}`;
+    // Hum naya aur stable API use kar rahe hain
+    const url = `https://jiosaavn-api-sigma.vercel.app/search/songs?query=${encodeURIComponent(query)}`;
 
     try {
         const response = await fetch(url);
-        
-        if (!response.ok) {
-            throw new Error("Server Response Error");
-        }
-
         const data = await response.json();
-        const songs = data.data.results;
+        
+        // Data check kar rahe hain
+        const songs = data.data.results || data.data;
 
         if (songs && songs.length > 0) {
             resultsDiv.innerHTML = ""; 
             songs.forEach(song => {
-                const title = song.name;
-                const image = song.image[2]?.url || song.image[0]?.url;
-                const artist = song.artists?.primary[0]?.name || "Artist";
-                const downloadUrl = song.downloadUrl[song.downloadUrl.length - 1].url;
+                // API ke alag-alag formats handle karne ke liye
+                const title = song.name || song.song;
+                const image = song.image ? (song.image[2]?.url || song.image[1]?.url) : "https://via.placeholder.com/150";
+                const artist = song.artists?.primary?.[0]?.name || song.primary_artists || "Artist";
+                
+                // Download URL nikalna
+                let downloadUrl = "";
+                if(song.downloadUrl) {
+                    downloadUrl = song.downloadUrl[song.downloadUrl.length - 1].url;
+                } else if (song.download_url) {
+                    downloadUrl = song.download_url;
+                }
 
-                const div = document.createElement('div');
-                div.className = 'song-card';
-                div.style = "display: flex; align-items: center; background: #282828; margin: 10px; padding: 10px; border-radius: 10px; cursor: pointer; border-bottom: 1px solid #333;";
-                div.innerHTML = `
-                    <img src="${image}" style="width:55px; height:55px; border-radius:5px; margin-right:15px;">
-                    <div style="flex:1; text-align:left;">
-                        <p style="margin:0; font-size:15px; color:white;"><strong>${title}</strong></p>
-                        <p style="margin:0; font-size:13px; color:#b3b3b3;">${artist}</p>
-                    </div>
-                `;
-                div.onclick = () => playSong(downloadUrl, title, image);
-                resultsDiv.appendChild(div);
+                if(downloadUrl) {
+                    const div = document.createElement('div');
+                    div.className = 'song-card';
+                    div.style = "display: flex; align-items: center; background: #222; margin: 10px 0; padding: 12px; border-radius: 12px; cursor: pointer; border: 1px solid #333;";
+                    div.innerHTML = `
+                        <img src="${image}" style="width:50px; height:50px; border-radius:8px; margin-right:15px; object-fit: cover;">
+                        <div style="flex:1; text-align:left;">
+                            <p style="margin:0; font-size:14px; color:#fff;"><strong>${title}</strong></p>
+                            <p style="margin:0; font-size:12px; color:#aaa;">${artist}</p>
+                        </div>
+                    `;
+                    div.onclick = () => playSong(downloadUrl, title, image);
+                    resultsDiv.appendChild(div);
+                }
             });
         } else {
-            resultsDiv.innerHTML = "<p>Koi gaana nahi mila. Dusra naam try karein!</p>";
+            resultsDiv.innerHTML = "<p>Koi gaana nahi mila. Kuch aur likhein!</p>";
         }
     } catch (error) {
         console.error(error);
-        resultsDiv.innerHTML = `<p style="color:orange;">Server se contact nahi ho pa raha. <br> Thodi der baad try karein ya VPN off karein.</p>`;
+        resultsDiv.innerHTML = `<p style='color:red;'>Internet ya Server Error! <br> Ek baar Flight Mode on-off karke try karein.</p>`;
     }
 }
 
@@ -58,5 +64,5 @@ function playSong(url, title, img) {
     document.getElementById('trackTitle').innerText = title;
     document.getElementById('trackImage').src = img;
     audio.src = url;
-    audio.play();
+    audio.play().catch(err => alert("Play error: Chrome browser use karein."));
 }
