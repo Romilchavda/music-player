@@ -1,3 +1,12 @@
+// Hum 3 alag-alag servers ki list rakhenge
+const servers = [
+    "https://pipedapi.kavin.rocks",
+    "https://pipedapi.oxymat.com",
+    "https://piped-api.lunar.icu"
+];
+
+let currentServer = servers[0];
+
 async function searchMusic() {
     const query = document.getElementById('searchInput').value;
     const resultsDiv = document.getElementById('results');
@@ -7,60 +16,70 @@ async function searchMusic() {
         return;
     }
 
-    resultsDiv.innerHTML = "<p style='color: #1db954;'>YouTube Music se Full Song dhoond raha hoon...</p>";
+    resultsDiv.innerHTML = "<p style='color: #1db954;'>Searching on YouTube Server... Ek pal rukein...</p>";
 
-    // Hum Piped API use karenge (YouTube Music ke liye)
-    // Ye block nahi hota kyunki iska naam alag hai
-    const searchUrl = `https://pipedapi.kavin.rocks/search?q=${encodeURIComponent(query)}&filter=music_songs`;
+    let success = false;
 
-    try {
-        const response = await fetch(searchUrl);
-        const data = await response.json();
-        const songs = data.items;
+    // Ek-ek karke servers try karenge
+    for (let server of servers) {
+        try {
+            const response = await fetch(`${server}/search?q=${encodeURIComponent(query)}&filter=music_songs`);
+            if (!response.ok) throw new Error("Next server please");
 
-        if (songs && songs.length > 0) {
-            resultsDiv.innerHTML = ""; 
-            songs.forEach(song => {
-                const title = song.title;
-                const image = song.thumbnail;
-                const artist = song.uploaderName;
-                // YouTube Video ID nikalna
-                const videoId = song.url.split("v=")[1];
+            const data = await response.json();
+            const songs = data.items;
 
-                const div = document.createElement('div');
-                div.className = 'song-card';
-                div.style = "display: flex; align-items: center; background: #222; margin: 10px 0; padding: 12px; border-radius: 12px; cursor: pointer; border: 1px solid #333;";
-                div.innerHTML = `
-                    <img src="${image}" style="width:55px; height:55px; border-radius:8px; margin-right:15px; object-fit: cover;">
-                    <div style="flex:1; text-align:left;">
-                        <p style="margin:0; font-size:14px; color:#fff;"><strong>${title}</strong></p>
-                        <p style="margin:0; font-size:12px; color:#aaa;">${artist}</p>
-                    </div>
-                `;
-                // Jab click karein toh stream link fetch karein
-                div.onclick = () => getStream(videoId, title, image);
-                resultsDiv.appendChild(div);
-            });
-        } else {
-            resultsDiv.innerHTML = "<p>Gaana nahi mila!</p>";
+            if (songs && songs.length > 0) {
+                currentServer = server; // Jo server chal gaya use yaad rakho
+                displayResults(songs);
+                success = true;
+                break; 
+            }
+        } catch (err) {
+            console.log("Server failed, trying next...");
         }
-    } catch (error) {
-        console.error(error);
-        resultsDiv.innerHTML = "<p style='color:red;'>Server Busy! Ek baar phir 'Search' dabayein.</p>";
+    }
+
+    if (!success) {
+        resultsDiv.innerHTML = "<p style='color:red;'>Sabhi servers busy hain! <br> Ek baar firse 'Search' button dabayein.</p>";
     }
 }
 
-// Full Song ka real audio link nikalne ke liye function
+function displayResults(songs) {
+    const resultsDiv = document.getElementById('results');
+    resultsDiv.innerHTML = ""; 
+
+    songs.forEach(song => {
+        const title = song.title;
+        const image = song.thumbnail;
+        const artist = song.uploaderName;
+        const videoId = song.url.split("v=")[1];
+
+        const div = document.createElement('div');
+        div.className = 'song-card';
+        div.style = "display: flex; align-items: center; background: #222; margin: 10px 0; padding: 12px; border-radius: 12px; cursor: pointer; border: 1px solid #333;";
+        div.innerHTML = `
+            <img src="${image}" style="width:55px; height:55px; border-radius:8px; margin-right:15px; object-fit: cover;">
+            <div style="flex:1; text-align:left;">
+                <p style="margin:0; font-size:14px; color:#fff;"><strong>${title}</strong></p>
+                <p style="margin:0; font-size:12px; color:#aaa;">${artist}</p>
+            </div>
+        `;
+        div.onclick = () => getStream(videoId, title, image);
+        resultsDiv.appendChild(div);
+    });
+}
+
 async function getStream(videoId, title, img) {
     const audio = document.getElementById('audioPlayer');
     document.getElementById('trackTitle').innerText = "Loading Full Song...";
     
     try {
-        const res = await fetch(`https://pipedapi.kavin.rocks/streams/${videoId}`);
+        const res = await fetch(`${currentServer}/streams/${videoId}`);
         const data = await res.json();
         
-        // Sabse badhiya audio stream dhoondna
-        const audioStream = data.audioStreams.find(s => s.format === 'M4A' || s.format === 'WEBm');
+        // M4A format sabse badhiya hota hai mobile ke liye
+        const audioStream = data.audioStreams.find(s => s.format === 'M4A') || data.audioStreams[0];
         const finalUrl = audioStream.url;
 
         document.getElementById('trackTitle').innerText = title;
@@ -68,6 +87,7 @@ async function getStream(videoId, title, img) {
         audio.src = finalUrl;
         audio.play();
     } catch (e) {
-        alert("Ye gaana play nahi ho raha, koi dusra try karein.");
+        alert("Ye gaana load nahi ho paya, doosra try karein.");
+        document.getElementById('trackTitle').innerText = "Error playing song";
     }
 }

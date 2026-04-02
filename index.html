@@ -1,21 +1,23 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>My Mobile Music Player</title>
     <link rel="stylesheet" href="style.css">
 </head>
+
 <body>
     <div class="container">
         <h1>🎵 My Music</h1>
         <div class="search-box">
             <input type="text" id="searchInput" placeholder="Gaana search karein...">
-            <button onclick="searchMusic()">Search</button>
+            <button type="button" onclick="searchMusic()">Search</button>
         </div>
-
+        
         <div id="results" class="results"></div>
-
+        
         <div class="player">
             <img id="trackImage" src="https://via.placeholder.com/150" alt="cover">
             <h3 id="trackTitle">Song Title</h3>
@@ -24,4 +26,5 @@
     </div>
     <script src="script.js"></script>
 </body>
+
 </html>
