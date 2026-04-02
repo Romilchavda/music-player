@@ -7,25 +7,24 @@ async function searchMusic() {
         return;
     }
 
-    resultsDiv.innerHTML = "<p style='color: #1db954;'>Searching via Proxy... Thoda intezar karein...</p>";
+    resultsDiv.innerHTML = "<p style='color: #1db954;'>Wait... Gaane dhoond raha hoon...</p>";
 
-    // Hum API ko ek proxy ke andar lapet kar bhejenge taaki block na ho
-    const targetUrl = `https://saavn.dev/api/search/songs?query=${encodeURIComponent(query)}`;
-    const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(targetUrl)}`;
+    // Naya Stable API Link (No Proxy Needed)
+    const url = `https://saavn.dev/api/search/songs?query=${encodeURIComponent(query)}`;
 
     try {
-        const response = await fetch(proxyUrl);
-        const data = await response.json();
+        const response = await fetch(url);
         
-        // Proxy se data "contents" ke andar string ban kar aata hai, use parse karna hoga
-        const finalData = JSON.parse(data.contents);
-        const songs = finalData.data.results;
+        if (!response.ok) throw new Error("Server down");
+
+        const resData = await response.json();
+        const songs = resData.data.results;
 
         if (songs && songs.length > 0) {
             resultsDiv.innerHTML = ""; 
             songs.forEach(song => {
                 const title = song.name;
-                const image = song.image[2]?.url || song.image[0]?.url;
+                const image = song.image[2]?.url || song.image[1]?.url;
                 const artist = song.artists?.primary[0]?.name || "Artist";
                 const downloadUrl = song.downloadUrl[song.downloadUrl.length - 1].url;
 
@@ -33,21 +32,21 @@ async function searchMusic() {
                 div.className = 'song-card';
                 div.style = "display: flex; align-items: center; background: #222; margin: 10px 0; padding: 12px; border-radius: 12px; cursor: pointer; border: 1px solid #333;";
                 div.innerHTML = `
-                    <img src="${image}" style="width:55px; height:55px; border-radius:8px; margin-right:15px;">
+                    <img src="${image}" style="width:55px; height:55px; border-radius:8px; margin-right:15px; background:#333;">
                     <div style="flex:1; text-align:left;">
                         <p style="margin:0; font-size:15px; color:#fff;"><strong>${title}</strong></p>
-                        <p style="margin:0; font-size:13px; color:#aaa;">${artist}</p>
+                        <p style="margin:0; font-size:12px; color:#aaa;">${artist}</p>
                     </div>
                 `;
                 div.onclick = () => playSong(downloadUrl, title, image);
                 resultsDiv.appendChild(div);
             });
         } else {
-            resultsDiv.innerHTML = "<p>Gaana nahi mila. Kuch aur try karein!</p>";
+            resultsDiv.innerHTML = "<p>Koi gaana nahi mila. Spelling check karein!</p>";
         }
     } catch (error) {
         console.error(error);
-        resultsDiv.innerHTML = `<p style='color:red;'>Proxy bhi fail ho gayi! <br> Shayad aapka internet connection weak hai. <br> Ek baar WiFi try karein ya Phone Restart karein.</p>`;
+        resultsDiv.innerHTML = `<p style='color:red;'>Error: Server connect nahi ho raha. <br> 1. Apna Internet check karein. <br> 2. Chrome browser hi use karein.</p>`;
     }
 }
 
@@ -56,5 +55,5 @@ function playSong(url, title, img) {
     document.getElementById('trackTitle').innerText = title;
     document.getElementById('trackImage').src = img;
     audio.src = url;
-    audio.play().catch(e => alert("Play error! Try another song."));
+    audio.play().catch(e => alert("Play error: Browser setting allow nahi kar rahi."));
 }
